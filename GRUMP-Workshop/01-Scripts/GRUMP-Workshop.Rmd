@@ -1,0 +1,31 @@
+---
+title: "R Notebook"
+output: html_notebook
+date: 14-6-2025
+author: Nathan Williams
+---
+
+First job is to install and load the packages that we are going to use today. A very useful package that many people use in R is tidyverse. It contains many useful tools such as dyplr for data wrangling, ggplot for making figures etc. IF you'd like to read more about what is available in this package, please see: https://www.tidyverse.org/
+
+```{r Install and load packages}
+install.packages("tidyverse") #This is only required once.
+library("tidyverse")
+```
+ 
+The next job is to set our working directory! If you have saved the GRUMP data from CMAP to your desktop in a folder called "GRUMP-Workshop", then you should be good to go.
+
+```{r Set Working directory}
+setwd("~/Desktop/GRUMP-Workshop")
+grump_data <- read_csv("Grump_Data.csv")
+```
+
+OK! We have the dataset loaded into R studio! Now, the first thing to do is familarise yourself with the dataset. Using str() will enable you to see whats in each column and its name.
+
+```{r Take a quick look at the dataset}
+str(grump_data)
+```
+
+```{r}
+
+```
+
