@@ -10,6 +10,6 @@ The Global rRNA Universal Metabarcoding Plankton database (GRUMP), which consist
 
 ![Figure-1-GRUMP-Map-and-depths-V2](https://github.com/user-attachments/assets/83887bbd-7b5d-4508-b9c2-c74c3cbd560d)
 
-Figure 1. Map of GRUMP transects, as well as their depth resolution.
+Figure 1. A) Map of GRUMP transects. B) Depth resolution of GRUMP samples.
 
 
