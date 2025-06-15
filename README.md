@@ -10,4 +10,7 @@ The Global rRNA Universal Metabarcoding Plankton database (GRUMP), which consist
 
 Figure 1. A) Map of GRUMP transects. B) Depth resolution of GRUMP samples.
 
+The dataset contains diverse taxa for which a summary can be seen in Figure 2. We have also curated auxiliary data to accomapany the ASV data including temperature, salinity, oxygen, as well as chlorophyll, nitrate, nitrite, silica, and phosphate where available. To help users plot their samples spatially, beyond latitude, longitude and depth, we have provided longhurst provinces, ocean basins, depth categories, and predicted euphotic zones.
 
+![Figure-3-reads-counts](https://github.com/user-attachments/assets/f9faf0bb-4549-44b5-8f19-6878932b09f1)
+Figure 2. Summary of GRUMP taxonomy.
