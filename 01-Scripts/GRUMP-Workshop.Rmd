@@ -1,0 +1,215 @@
+---
+title: "R Notebook"
+output: html_notebook
+date: 14-6-2025
+author: Nathan Williams
+---
+
+First job is to install and load the packages that we are going to use today. A very useful package that many people use in R is tidyverse. It contains many useful tools such as dyplr for data wrangling, ggplot for making figures etc. If you'd like to read more about what is available in this package, please see: https://www.tidyverse.org/
+
+We will also be using rnaturalearth for our maps! 
+
+```{r Install packages}
+install.packages("tidyverse")
+install.packages("rnaturalearth")
+install.packages("rnaturalearthdata")
+install.packages("sf")
+```
+ 
+```{r Load packages}
+library("tidyverse")
+library("rnaturalearth")
+library("rnaturalearthdata")
+library("sf")
+```
+ 
+ 
+The next job is to set our working directory! If you have saved the GRUMP data from CMAP to your desktop in a folder called "GRUMP-Workshop", then you should be good to go.
+
+```{r Set Working directory}
+setwd("~/Desktop/GRUMP-Workshop/02-Data/")
+grump_data <- read_csv("Grump_data.csv")
+```
+
+OK! We have the dataset loaded into R studio! Now, the first thing to do is familarise yourself with the dataset. Using str() will enable you to see whats in each column and its name.
+
+```{r Take a quick look at the dataset}
+str(grump_data)
+```
+
+Now it's time to make a dataframe of just the taxonomy. GRUMP is big, and searching for things in it can labour ones computer, so if we make a smaller taxonomy dataframe, we can search nice and quickly for the taxa we are interested in. Once you've run this script, on the right hand side in the environment box, you should see "grump_taxonomy" show up. Click that and use the search bar to search for your favorite microbe.
+
+```{r Grump Taxonomy}
+grump_taxonomy <- grump_data %>% select(Domain, Supergroup, Division, Phylum, Class, Order, Family, Genus, Species, ProPortal_ASV_Ecotype, Sequence_Type, ASV_hash, ASV) %>%
+  group_by(ASV_hash, Domain) %>%
+  distinct(ASV_hash, .keep_all = TRUE)
+```
+
+Okay! Now its time to subset that favorite microbe. I'm deciding to plot Vibrio. So I've searched for Vibrio in the grump_taxonomy and can see that Vibrio is in the Genus column, right where it should be. I will use the code: filter(Genus %in% c("Vibrio")) to make a subset data table for the Vibrio that we see in GRUMP. We'll make a subset for the taxonomy (so we can easily browse the taxonomy) and from the grump_data so that we can plot up the data! You can replace "Genus" and "Vibrio" for whichever taxa you can find in the grump_taxonomy file.
+
+```{r Make a subset for your taxa}
+my_planktons_taxonomy <- grump_taxonomy %>% filter(Genus %in% c("Vibrio"))
+my_plankton_data <- grump_data %>% filter(Genus %in% c("Vibrio"))
+```
+
+And then we calculate the total relative abundance of the Vibrio genus at each Sample_ID. We need to calculate this because there will be multiple ASVs for many organisms per SampleID. Note, if you have chosen something other than a Genus here, you need to change Genus in this part of the code to whatever level you have chosen. We will then use distinct, so that we only have one row for each SampleID.
+
+```{r Calculate total relative abundance}
+my_plankton_data <- my_plankton_data %>%
+  group_by(SampleID, Genus) %>% #Here is where you will change Genus if applicable.
+mutate(Total_Relative_Abundance = sum(Relative_Abundance)) %>%
+  ungroup() %>%
+  distinct(SampleID, .keep_all = TRUE)
+```
+
+Now we create the map! The first few bits of code are loading the map data and orienting it, and then we plot the data using ggplot.
+
+```{r Create the map figure}
+# Load world map and set CRS
+world <- ne_countries(scale = "medium", returnclass = "sf") %>%
+  st_set_crs(4326)
+
+# Define Robinson projection centered on -130°
+robinson <- "+proj=robin +lon_0=-130 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"
+
+# Handle antimeridian and reproject
+world_robinson <- world %>%
+  st_break_antimeridian(lon_0 = -130) %>%
+  st_transform(crs = robinson)
+
+# Convert my_plankton__data to sf and transform
+my_plankton_sf <- st_as_sf(
+  my_plankton_data,
+  coords = c("Longitude", "Latitude"),
+  crs = 4326
+) %>%
+  st_transform(crs = robinson)
+
+# Create the plot
+my_plankton_map <- ggplot() +
+  # Map background
+  geom_sf(data = world_robinson, fill = "grey90", color = NA) +
+  # Bubble data
+  geom_sf(data = my_plankton_sf,
+          aes(size = Total_Relative_Abundance),
+          color = "#00b2f6", alpha = 0.7) +
+  
+  # Scale for bubble size
+  scale_size_continuous(
+    name = "Relative Abundance",
+    range = c(2, 16)
+  ) +
+  
+  # Title and theme
+  ggtitle("My plankton in the ocean") +
+  coord_sf(crs = robinson) +
+  theme_minimal(base_size = 18) +
+  theme(
+    plot.title = element_text(size = 20, face = "bold", hjust = 0.5, margin = margin(b = 10)),
+    axis.title = element_blank(),
+    axis.text = element_text(size = 14),
+    legend.position = "bottom",
+    legend.title = element_text(size = 16, face = "bold"),
+    legend.text = element_text(size = 14),
+    panel.grid = element_line(color = "grey85", size = 0.2)
+  )
+
+print(my_plankton_map)
+
+# Save to PDF
+setwd("~/Desktop/GRUMP-Workshop/03-Figures/")
+ggsave("my_plankton_map.pdf",
+       plot = my_plankton_map,
+       width = 11.7, height = 7)
+```
+
+Ok great! That map is a good snap shot, but it doesn't really give us much information about where the organism occurs in the water column. In the interest of time and simplicity, we are going to plot the top 200m for the whole ocean, but one can easily extend that as they see fit.
+
+Next we'll create a function which will allow one to put in their desired Ocean_Basin and see what the data looks like.
+
+```{r Create the function}
+#Filter the data for top 200m, keeping depth resolution
+my_plankton_data_depth_filtered <- my_plankton_data %>%
+  filter(depth <= 200)
+
+#Calculate the global max for Total_Relative_Abundance across all cruises
+global_max_abundance <- max(my_plankton_data_depth_filtered$Total_Relative_Abundance, na.rm = TRUE)
+
+#Create a function to generate depth profile plots
+plot_depth_profile <- function(..., plot_title = "Depth Profile") {
+  selected_cruises <- c(...)  # Capture multiple cruise names
+  plot_data <- my_plankton_data_depth_filtered %>%
+    filter(Ocean_Basin %in% selected_cruises)  # Filter for selected cruises
+
+  ggplot(plot_data, aes(x = lat, y = -depth, size = Total_Relative_Abundance, color = Ocean_Basin)) +
+    geom_point(alpha = 1) +
+    scale_size_continuous(range = c(1, 20), name = "Relative Abundance", limits = c(0, global_max_abundance)) +
+    theme_minimal() +
+    labs(title = plot_title,
+         x = "Latitude",
+         y = "Depth (m)",
+         color = "Ocean_Basin") +
+    theme(axis.text.x = element_text(size = 10, color = "black"),
+          axis.text.y = element_text(size = 10, color = "black")) +
+      theme(
+    text = element_text(size = 16),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 14),
+    axis.text.y = element_text(size = 14),
+    axis.title.x = element_text(size = 18, face = "bold"),
+    axis.title.y = element_text(size = 18, face = "bold"),
+    plot.title = element_text(size = 20, face = "bold", hjust = 0.5),
+    legend.position = "bottom",
+    legend.text = element_text(size = 14),
+    legend.title = element_text(size = 16, face = "bold")
+  )
+}
+```
+
+First thing is to get a snap shot and to take a look at the whole data with every ocean basin.
+
+```{r Plot all ocean basins }
+all_ocean_basins_depth_profile <- plot_depth_profile("Atlantic.Ocean", "Southern.Ocean", "Indian.Ocean",   "Arctic.Ocean",   "Pacific.Ocean", plot_title = "Depth Profile")
+print(all_ocean_basins_depth_profile)
+
+# Save to PDF
+setwd("~/Desktop/GRUMP-Workshop/03-Figures/")
+ggsave("all_ocean_basins_depth_profile.pdf",
+       plot = all_ocean_basins_depth_profile,
+       width = 11.7, height = 7)
+```
+
+So the next thing that we can do is to plot this data by Longhurst Province to gain a more fine scale idea of where our plankton are most abundant in the ocean.
+
+```{r Longhurst Boxplots}
+#Generate the ordered boxplot grouped by Longhurst Province
+Longhurst_Box_Plot <- ggplot(my_plankton_data, aes(
+    x = factor(Longhurst_Long),  # Apply ordering in the plot
+    y = Total_Relative_Abundance, 
+    fill = Longhurst_Long
+  )) +
+  geom_boxplot(alpha = 1, outlier.shape = NA) +  # Boxplot without outliers
+  geom_jitter(width = 0.2, size = 1, alpha = 0.5) +  # Jittered points for visualization
+  scale_y_log10() +  # Log scale for better visualization
+  theme_minimal() +
+  labs(title = "My Plankton Abundance by Longhurst Province",
+       x = "Ocean Basin",
+       y = "Total Relative Abundance",
+       fill = "Longhurst Province") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    theme(
+    text = element_text(size = 16),
+    axis.text.x = element_text(angle = 90, hjust = 1, size = 14),
+    axis.text.y = element_text(size = 14),
+    axis.title.x = element_text(size = 18, face = "bold"),
+    axis.title.y = element_text(size = 18, face = "bold"),
+    plot.title = element_text(size = 20, face = "bold", hjust = 0.5),
+    legend.position = "none",
+    legend.text = element_text(size = 14),
+    legend.title = element_text(size = 16, face = "bold")
+  )
+Longhurst_Box_Plot
+
+setwd("~/Desktop/GRUMP-Workshop/03-Figures/")
+ggsave("My_Plankton_Longhurst_Box_Plot.pdf", plot = Longhurst_Box_Plot, width = 11.69, height = 8.27, units = "in")
+```
+
